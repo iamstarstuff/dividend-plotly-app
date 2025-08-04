@@ -1,0 +1,5 @@
+Plotly
+Dash
+pandas
+numpy
+plotly_express
