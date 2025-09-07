@@ -1,5 +1,16 @@
-Plotly
-Dash
-pandas
-numpy
-plotly_express
+# Simplified requirements for CSV-based dividend app
+Plotly>=5.17.0
+Dash>=2.14.0
+dash-bootstrap-components>=1.5.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Data fetching
+yfinance>=0.2.18
+requests>=2.31.0
+
+# Scheduling and automation (optional)
+schedule>=1.2.0
+
+# Utilities
+python-dotenv>=1.0.0

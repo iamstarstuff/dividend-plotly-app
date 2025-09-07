@@ -1,0 +1,97 @@
+ticker_symbol,company_name,current_yield,avg_dividend_yield,payment_frequency,yield_volatility,dividend_category,country,sector,market_cap
+KT,KT Corporation,15888.78,2.53,7,2.23,tobacco_telecom,South Korea,Communication Services,9777353728
+ECC,Eagle Point Credit Company Inc.,2225.0,2.24,62,1.17,closed_end_funds,United States,Financial Services,953806656
+CHMI,Cherry Hill Mortgage Investment Corporation,2069.0,5.84,20,1.01,mortgage_reits,United States,Real Estate,106253976
+ORC,"Orchid Island Capital, Inc.",2003.0,2.32,60,0.45,mortgage_reits,United States,Real Estate,957513856
+PSEC,Prospect Capital Corporation,1869.0,1.29,61,0.22,bdc_companies,United States,Financial Services,1336171392
+ARR,"ARMOUR Residential REIT, Inc.",1820.0,2.0,60,0.51,mortgage_reits,United States,Real Estate,1824678784
+PTMN,BCP Investment Corp.,1785.0,4.63,20,0.88,bdc_companies,United States,Financial Services,161864624
+IVR,Invesco Mortgage Capital Inc.,1704.0,6.08,20,1.79,mortgage_reits,United States,Real Estate,529133056
+DX,"Dynex Capital, Inc.",1579.0,1.33,60,0.14,mortgage_reits,United States,Real Estate,1678463104
+TWO,Two Harbors Investment Corp.,1573.0,4.72,20,0.91,mortgage_reits,United States,Real Estate,1078807424
+AGNC,AGNC Investment Corp.,1389.0,1.52,60,0.23,mortgage_reits,United States,Real Estate,10802740224
+MFA,"MFA Financial, Inc.",1385.0,4.16,20,1.11,mortgage_reits,United States,Real Estate,1067757568
+TCPC,BlackRock TCP Capital Corp.,1381.0,4.0,21,1.09,bdc_companies,United States,Financial Services,615664192
+OCSL,Oaktree Specialty Lending Corporation,1317.0,3.58,20,0.71,bdc_companies,United States,Financial Services,1230554496
+PMT,PennyMac Mortgage Investment Trust,1270.0,3.95,20,0.67,mortgage_reits,United States,Real Estate,1096409216
+NLY,"Annaly Capital Management, Inc.",1268.0,4.59,20,0.94,mortgage_reits,United States,Real Estate,14183459840
+GSBD,"Goldman Sachs BDC, Inc.",1224.0,3.33,25,1.54,bdc_companies,United States,Financial Services,1305452672
+JFR,Nuveen Floating Rate Income Fund,1209.0,1.06,60,0.15,closed_end_funds,United States,Financial Services,1131432576
+NMFC,New Mountain Finance Corporation,1205.0,3.35,21,0.7,bdc_companies,United States,Financial Services,1129553792
+PFLT,PennantPark Floating Rate Capital Ltd.,1199.0,1.15,60,0.18,bdc_companies,United States,Financial Services,1017975744
+JQC,Nuveen Credit Strategies Income Fund,1189.0,1.24,60,0.34,closed_end_funds,United States,Financial Services,742289984
+CGBD,"Carlyle Secured Lending, Inc.",1160.0,4.03,20,1.06,bdc_companies,United States,Financial Services,1005332352
+CSWC,Capital Southwest Corporation,1115.0,3.56,22,1.28,bdc_companies,United States,Financial Services,1277230336
+NCV,Virtus Convertible & Income Fund,1099.0,1.3,60,0.22,closed_end_funds,United States,Financial Services,335512000
+NYMT,"New York Mortgage Trust, Inc.",1087.0,4.17,20,0.93,mortgage_reits,United States,Real Estate,642132544
+MITT,"AG Mortgage Investment Trust, Inc.",1080.0,3.13,21,1.32,mortgage_reits,United States,Real Estate,246878080
+FDUS,Fidus Investment Corporation,1066.0,3.86,20,0.72,bdc_companies,United States,Financial Services,756776064
+NCZ,Virtus Convertible & Income Fund II,1060.0,1.3,60,0.24,closed_end_funds,United States,Financial Services,258602752
+GBDC,"Golub Capital BDC, Inc.",1058.0,2.28,26,1.11,bdc_companies,United States,Financial Services,3929046016
+CIM,Chimera Investment Corporation,1004.0,3.94,20,1.18,mortgage_reits,United States,Real Estate,1195014528
+CJ.TO,Cardinal Energy Ltd.,990.0,1.0,39,0.09,energy_trusts,Canada,Energy,1167285760
+SLRC,SLR Investment Corp.,982.0,2.04,32,1.01,bdc_companies,United States,Financial Services,911061888
+JPC,Nuveen Preferred & Income Opportunities Fund,979.0,0.84,61,0.12,closed_end_funds,United States,Financial Services,2621854976
+HTGC,"Hercules Capital, Inc.",978.0,3.61,20,0.84,bdc_companies,United States,Financial Services,3493629440
+JPI,Nuveen Preferred Securities & Income Opportunities Fund,973.0,0.75,60,0.1,closed_end_funds,United States,Financial Services,288624928
+EXG,Eaton Vance Tax-Managed Global Diversified Equity Income Fund,882.0,0.93,60,0.12,closed_end_funds,United States,Financial Services,2735067648
+ARCC,Ares Capital Corporation,856.0,2.99,20,0.52,bdc_companies,United States,Financial Services,15828434944
+TSLX,"Sixth Street Specialty Lending, Inc.",842.0,1.87,40,1.73,bdc_companies,United States,Financial Services,2316429056
+JHI,John Hancock Investors Trust,838.0,2.4,20,0.43,closed_end_funds,United States,Financial Services,124697288
+FRU.TO,Freehold Royalties Ltd.,819.0,0.68,60,0.09,energy_trusts,Canada,Energy,2162632448
+EVT,Eaton Vance Tax-Advantaged Dividend Income Fund,812.0,0.8,60,0.08,closed_end_funds,United States,Financial Services,1856148736
+NXJ,Nuveen New Jersey Quality Municipal Income Fund,809.0,0.5,60,0.13,closed_end_funds,United States,Financial Services,480363264
+SGY.TO,Surge Energy Inc.,785.0,0.63,39,0.13,energy_trusts,Canada,Energy,655989696
+NZF,Nuveen Municipal Credit Income Fund,783.0,0.53,62,0.12,closed_end_funds,United States,Financial Services,2361556224
+GLAD,Gladstone Capital Corporation,760.0,0.87,62,0.2,bdc_companies,United States,Financial Services,581693888
+ETO,Eaton Vance Tax-Advantaged Global Dividend Opportunities Fund,760.0,0.77,60,0.1,closed_end_funds,United States,Financial Services,448214528
+EOS,Eaton Vance Enhanced Equity Income Fund II,758.0,0.77,60,0.12,closed_end_funds,United States,Financial Services,1280814848
+EOI,Eaton Vance Enhanced Equity Income Fund,750.0,0.78,60,0.08,closed_end_funds,United States,Financial Services,874979136
+ETG,Eaton Vance Tax-Advantaged Global Dividend Income Fund,747.0,0.78,60,0.11,closed_end_funds,United States,Financial Services,1585969280
+TU,TELUS Corporation,727.0,1.6,20,0.22,tobacco_telecom,Canada,Communication Services,25353424896
+WCP.TO,Whitecap Resources Inc.,724.0,0.53,60,0.15,energy_trusts,Canada,Energy,12415535104
+PEY.TO,Peyto Exploration & Development Corp.,720.0,0.72,51,0.26,energy_trusts,Canada,Energy,3678501120
+MS-PE,Morgan Stanley,704.0,1.99,19,0.1,preferred_stocks,United States,Financial Services,65042014208
+GAIN,Gladstone Investment Corporation,676.0,1.05,73,1.07,bdc_companies,United States,Financial Services,543094848
+NAZ,Nuveen Arizona Quality Municipal Income Fund,665.0,0.45,60,0.12,closed_end_funds,United States,Financial Services,137080080
+TEF,"Telefónica, S.A.",647.0,4.95,10,1.37,tobacco_telecom,Spain,Communication Services,30106492928
+MAIN,Main Street Capital Corporation,640.0,0.62,74,0.16,bdc_companies,United States,Financial Services,5948910080
+MO,"Altria Group, Inc.",637.0,2.44,20,0.33,tobacco_telecom,United States,Consumer Defensive,111796690944
+NEWT,"NewtekOne, Inc.",632.0,2.8,20,1.4,bdc_companies,United States,Financial Services,316652448
+VZ,Verizon Communications Inc.,611.0,1.71,20,0.27,tobacco_telecom,United States,Communication Services,187120287744
+WFC-PL,Wells Fargo & Company,607.0,1.73,20,0.11,preferred_stocks,United States,Financial Services,193175683072
+MS-PA,Morgan Stanley,604.0,1.63,19,0.3,preferred_stocks,United States,Financial Services,78593630208
+EIM,Eaton Vance Municipal Bond Fund,596.0,0.46,60,0.05,closed_end_funds,United States,Financial Services,553201536
+JPM-PC,JPMorgan Chase & Co.,587.0,1.68,20,0.1,preferred_stocks,United States,Financial Services,335159787520
+BAC-PK,Bank of America Corporation,580.0,1.66,18,0.1,preferred_stocks,United States,Financial Services,253927636992
+BAC-PL,Bank of America Corporation,574.0,1.65,19,0.12,preferred_stocks,United States,Financial Services,0
+JPM-PD,JPMorgan Chase & Co.,568.0,1.64,20,0.1,preferred_stocks,United States,Financial Services,336125689856
+NNN,"NNN REIT, Inc.",554.0,1.49,20,0.16,utility_reits,United States,Real Estate,8183699456
+BTI,British American Tobacco p.l.c.,553.0,2.45,20,0.33,tobacco_telecom,United Kingdom,Consumer Defensive,122272063488
+O,Realty Income Corporation,544.0,0.47,60,0.04,utility_reits,United States,Real Estate,54209204224
+JHS,John Hancock Income Securities Trust,533.0,1.48,21,0.59,closed_end_funds,United States,Financial Services,135217024
+WPC,W. P. Carey Inc.,528.0,1.69,20,0.22,utility_reits,United States,Real Estate,14917667840
+VET.TO,Vermilion Energy Inc.,515.0,0.68,14,0.33,energy_trusts,Canada,Energy,1555592064
+BCE,BCE Inc.,514.0,2.08,20,0.41,tobacco_telecom,Canada,Communication Services,23103236096
+NETL,Fundamental Income Net Lease Real Estate ETF,480.0,0.48,56,0.26,utility_reits,Unknown,Unknown,0
+NXP,Nuveen Select Tax-Free Income Portfolio,454.0,0.36,60,0.03,closed_end_funds,United States,Financial Services,725749312
+NUV,"Nuveen Municipal Value Fund, Inc.",445.0,0.35,60,0.03,closed_end_funds,United States,Financial Services,1820143488
+CCI,Crown Castle Inc.,442.0,1.25,20,0.3,utility_reits,United States,Real Estate,41870442496
+EXR,Extra Space Storage Inc.,440.0,0.96,21,0.19,utility_reits,United States,Real Estate,32637392896
+VOD,Vodafone Group Public Limited Company,422.0,4.51,10,1.22,tobacco_telecom,United Kingdom,Communication Services,28466589696
+ADC,Agree Realty Corporation,421.0,0.42,58,0.15,utility_reits,United States,Real Estate,8109573120
+PSA,Public Storage,403.0,1.12,21,0.8,utility_reits,United States,Real Estate,52249899008
+STAG,"STAG Industrial, Inc.",403.0,0.38,60,0.05,utility_reits,United States,Real Estate,7048123904
+CHT,"Chunghwa Telecom Co., Ltd.",378.0,4.15,5,0.31,tobacco_telecom,Taiwan,Communication Services,34272415744
+T,AT&T Inc.,375.0,2.09,20,0.79,tobacco_telecom,United States,Communication Services,211580026880
+PLD,"Prologis, Inc.",355.0,0.72,20,0.14,utility_reits,United States,Real Estate,105474359296
+TOU.TO,Tourmaline Oil Corp.,345.0,1.2,36,1.06,energy_trusts,Canada,Energy,22433259520
+AMT,American Tower Corporation,343.0,0.74,20,0.16,utility_reits,United States,Real Estate,92863545344
+PM,Philip Morris International Inc.,334.0,1.45,20,0.29,tobacco_telecom,United States,Consumer Defensive,251467104256
+VIV,Telefônica Brasil S.A.,301.0,0.98,40,0.97,tobacco_telecom,Brazil,Communication Services,20117477376
+DLR,"Digital Realty Trust, Inc.",299.0,0.96,20,0.18,utility_reits,United States,Real Estate,56696844288
+POU.TO,Paramount Resources Ltd.,296.0,2.45,52,11.61,energy_trusts,Canada,Energy,2904690944
+EQIX,"Equinix, Inc.",242.0,0.49,20,0.06,utility_reits,United States,Real Estate,75715420160
+SBAC,SBA Communications Corporation,225.0,0.34,20,0.13,utility_reits,United States,Real Estate,21233123328
+BIR.TO,Birchcliff Energy Ltd.,194.0,1.21,21,1.19,energy_trusts,Canada,Energy,1690501504
+C-PN,Citigroup Capital XIII TR PFD SECS,0.0,2.57,20,0.4,preferred_stocks,Unknown,Unknown,0
