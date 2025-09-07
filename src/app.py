@@ -1189,4 +1189,6 @@ def update_summary_stats(selected_stock, timeframe_years):
         return html.P(f"Error calculating statistics: {str(e)}", style={'color': '#ff6b6b'})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8050)
+    # For deployment on Render or other cloud platforms
+    port = int(os.environ.get('PORT', 8050))
+    app.run(debug=False, host='0.0.0.0', port=port)
