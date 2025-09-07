@@ -327,6 +327,22 @@ app.layout = dbc.Container([
         ])
     ]),
     
+    # Disclaimer Notice
+    dbc.Row([
+        dbc.Col([
+            dbc.Alert([
+                html.H5("⚠️ Important Disclaimer", style={'color': '#856404', 'margin-bottom': '10px'}),
+                html.P([
+                    "The data presented in this dashboard is for informational purposes only and should ",
+                    html.Strong("not be considered ground truth"), 
+                    ". Investment decisions should ",
+                    html.Strong("never"), 
+                    " be made solely based on the values shown here. Always verify all financial data with reliable, official sources before making any investment decisions. Past performance does not guarantee future results."
+                ], style={'margin-bottom': '0'})
+            ], color="warning", style={'margin-bottom': '20px'})
+        ])
+    ]),
+    
     # Control Panel with 4 Dropdowns
     dbc.Card([
         dbc.CardHeader([
@@ -454,8 +470,24 @@ app.layout = dbc.Container([
     
     # Footer
     html.Hr(style={'border-color': '#555'}),
-    html.P("🌍 Global Dividend Analysis Dashboard - Real-time data from major exchanges worldwide", 
-           className="text-center", style={'color': '#888', 'margin-top': '20px'})
+    dbc.Row([
+        dbc.Col([
+            html.P("🌍 Global Dividend Analysis Dashboard - Real-time data from major exchanges worldwide", 
+                   className="text-center", style={'color': '#888', 'margin-top': '20px', 'margin-bottom': '10px'}),
+            html.P([
+                "Created by ",
+                html.A("Pratik Barve", 
+                       href="https://github.com/iamstarstuff",
+                       target="_blank",
+                       style={'color': '#00CC96', 'text-decoration': 'none', 'font-weight': 'bold'}),
+                " | ",
+                html.A("GitHub Profile", 
+                       href="https://github.com/iamstarstuff",
+                       target="_blank",
+                       style={'color': '#00CC96', 'text-decoration': 'none'})
+            ], className="text-center", style={'color': '#888', 'font-size': '0.9em'})
+        ])
+    ])
     
 ], fluid=True, style={'backgroundColor': '#1e1e1e', 'min-height': '100vh', 'padding': '20px'})
 
