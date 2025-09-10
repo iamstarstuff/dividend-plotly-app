@@ -425,9 +425,19 @@ app.layout = dbc.Container([
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(id="stock-info-panel")
-            ], style={'backgroundColor': '#333', 'border': '1px solid #555'})
-        ], width=12)
-    ], className="mb-3"),
+            ], style={'backgroundColor': '#333', 'border': '1px solid #555', 'height': '160px'})
+        ], width=6, className="pr-1"),
+        
+        # Key Metrics Panel (Right side of stock info) - Wider now
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("🎯 Key Metrics", style={'color': '#fff', 'margin': '0', 'text-align': 'center'})
+                ]),
+                dbc.CardBody(id="key-metrics-panel", style={'padding': '10px', 'overflow': 'visible'})
+            ], style={'backgroundColor': '#333', 'border': '1px solid #555', 'height': '160px'})
+        ], width=6, className="pl-1")
+    ], className="mb-3 no-gutters"),
     
     # Charts Section
     dbc.Row([
@@ -435,7 +445,7 @@ app.layout = dbc.Container([
         dbc.Col([
             dbc.Card([
                 dbc.CardHeader([
-                    html.H5("📈 Dividend Yield Timeline", style={'color': '#fff', 'margin': '0'})
+                    html.H5("� Dividend Yield Timeline", style={'color': '#fff', 'margin': '0'})
                 ]),
                 dbc.CardBody([
                     dcc.Graph(id="yield-timeline-chart")
@@ -822,8 +832,6 @@ def update_stock_info(selected_stock):
             ], width=6),
             dbc.Col([
                 html.P(f"📈 Avg Historical Yield: {avg_yield:.2f}%", style={'color': '#fff', 'margin-bottom': '5px'}),
-                html.P(f"🎯 Estimated Annual Yield: {annual_yield:.1f}%" if annual_yield else "🎯 Annual Yield: Data unavailable", 
-                       style={'color': '#00CC96', 'margin-bottom': '5px', 'font-weight': 'bold', 'font-size': '1.1em'}),
                 html.P(f"💰 Latest Dividend: {currency_symbol}{latest_dividend:.3f}", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"📅 Last Payment: {latest_date.strftime('%Y-%m-%d')}", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"📊 Total Records: {total_dividends}", style={'color': '#fff', 'margin-bottom': '5px'})
@@ -832,6 +840,120 @@ def update_stock_info(selected_stock):
     except Exception as e:
         logger.error(f"Error updating stock info: {e}")
         return html.P(f"Error loading stock information: {str(e)}", style={'color': '#ff6b6b'})
+
+# Callback for key metrics panel
+@app.callback(
+    Output('key-metrics-panel', 'children'),
+    [Input('stock-dropdown', 'value'),
+     Input('timeframe-dropdown', 'value')]
+)
+def update_key_metrics(selected_stock, timeframe_years):
+    """Update key metrics panel with the three main values"""
+    if not selected_stock or selected_stock == 'none' or selected_stock.startswith('header_'):
+        return html.Div([
+            html.P("Select a stock to view key metrics", style={'color': '#888', 'text-align': 'center'})
+        ])
+    
+    try:
+        # Use cached data
+        df = get_cached_data()
+        
+        # Filter for selected stock
+        stock_data = df[df['ticker_symbol'] == selected_stock].copy()
+        stock_data['dividend_date'] = pd.to_datetime(stock_data['dividend_date'])
+        
+        # Filter by timeframe for TTM calculation
+        cutoff_date = datetime.now() - timedelta(days=365 * timeframe_years)
+        stock_data = stock_data[stock_data['dividend_date'] >= cutoff_date]
+        
+        stock_data['dividend_per_share'] = pd.to_numeric(stock_data['dividend_per_share'], errors='coerce')
+        stock_data['dividend_yield_pct'] = pd.to_numeric(stock_data['dividend_yield_pct'], errors='coerce')
+        stock_data = stock_data.dropna(subset=['dividend_per_share', 'dividend_yield_pct'])
+        
+        if stock_data.empty:
+            return html.P("No data available", style={'color': '#ff6b6b', 'text-align': 'center'})
+        
+        # Get currency information
+        currency = stock_data['currency'].iloc[0] if 'currency' in stock_data.columns else 'USD'
+        currency_symbols = {
+            'USD': '$', 'CAD': 'C$', 'GBP': '£', 'EUR': '€', 
+            'AUD': 'A$', 'INR': '₹', 'JPY': '¥', 'CNY': '¥',
+            'HKD': 'HK$', 'SGD': 'S$', 'CHF': 'CHF', 'SEK': 'kr',
+            'NOK': 'kr', 'DKK': 'kr', 'PLN': 'zł', 'CZK': 'Kč'
+        }
+        currency_symbol = currency_symbols.get(currency, currency + ' ')
+        
+        # Calculate the three key metrics
+        
+        # 1. Estimated Annual Yield (using same method as stock info panel)
+        avg_dividend = stock_data['dividend_per_share'].mean()
+        dividend_count = len(stock_data)
+        latest_price_data = stock_data.iloc[-1] if not stock_data.empty else None
+        estimated_annual_yield = None
+        
+        if latest_price_data is not None and 'share_price_on_dividend_date' in stock_data.columns:
+            recent_price = latest_price_data['share_price_on_dividend_date']
+            if recent_price > 0 and avg_dividend > 0:
+                estimated_annual_yield = (avg_dividend * min(dividend_count, 4) / recent_price) * 100
+        
+        # 2. Current Annual Yield (TTM method)
+        recent_dividends = stock_data[stock_data['dividend_date'] >= (datetime.now() - timedelta(days=365))]
+        annual_dividend_total = recent_dividends['dividend_per_share'].sum() if not recent_dividends.empty else 0
+        current_annual_yield = None
+        
+        if latest_price_data is not None and 'share_price_on_dividend_date' in stock_data.columns:
+            recent_price = latest_price_data['share_price_on_dividend_date']
+            if recent_price > 0 and annual_dividend_total > 0:
+                current_annual_yield = (annual_dividend_total / recent_price) * 100
+        
+        # 3. Last 12 Months Dividends
+        annual_dividends_amount = annual_dividend_total
+        
+        return html.Div([
+            # Three metrics side by side
+            html.Div([
+                # Estimated Annual Yield Square
+                html.Div([
+                    html.Div(f"{estimated_annual_yield:.1f}%" if estimated_annual_yield else "N/A", 
+                           style={'color': '#fff', 'font-weight': 'bold', 'font-size': '1.4em', 
+                                  'display': 'flex', 'align-items': 'center', 'justify-content': 'center',
+                                  'height': '60px', 'width': '100%', 'background-color': '#1f4e79',
+                                  'border': '2px solid #00CC96', 'border-radius': '8px'}),
+                    html.P("🎯 Estimated Annual Yield", 
+                          style={'color': '#00CC96', 'font-size': '0.7em', 'text-align': 'center', 
+                                 'margin-top': '5px', 'margin-bottom': '0', 'line-height': '1.1'})
+                ], style={'flex': '1', 'margin-right': '5px'}),
+                
+                # Current Yield Square  
+                html.Div([
+                    html.Div(f"{current_annual_yield:.2f}%" if current_annual_yield else "N/A", 
+                           style={'color': '#fff', 'font-weight': 'bold', 'font-size': '1.4em',
+                                  'display': 'flex', 'align-items': 'center', 'justify-content': 'center',
+                                  'height': '60px', 'width': '100%', 'background-color': '#4a4a00',
+                                  'border': '2px solid #FFA500', 'border-radius': '8px'}),
+                    html.P("📈 Current Yield", 
+                          style={'color': '#FFA500', 'font-size': '0.7em', 'text-align': 'center',
+                                 'margin-top': '5px', 'margin-bottom': '0', 'line-height': '1.1'})
+                ], style={'flex': '1', 'margin-left': '5px', 'margin-right': '5px'}),
+                
+                # Last 12 Months Dividend Square
+                html.Div([
+                    html.Div(f"{currency_symbol}{annual_dividends_amount:.2f}" if annual_dividends_amount > 0 else "N/A", 
+                           style={'color': '#fff', 'font-weight': 'bold', 'font-size': '1.2em',
+                                  'display': 'flex', 'align-items': 'center', 'justify-content': 'center',
+                                  'height': '60px', 'width': '100%', 'background-color': '#0d4f5c',
+                                  'border': '2px solid #17A2B8', 'border-radius': '8px'}),
+                    html.P("💰 Last 12 Months Dividend", 
+                          style={'color': '#17A2B8', 'font-size': '0.7em', 'text-align': 'center',
+                                 'margin-top': '5px', 'margin-bottom': '0', 'line-height': '1.1'})
+                ], style={'flex': '1', 'margin-left': '5px'})
+                
+            ], style={'display': 'flex', 'width': '100%', 'height': '100%', 'align-items': 'flex-start'})
+        ], style={'width': '100%', 'padding': '0', 'height': '100%'})
+        
+    except Exception as e:
+        logger.error(f"Error updating key metrics: {e}")
+        return html.P(f"Error loading metrics: {str(e)}", style={'color': '#ff6b6b', 'text-align': 'center'})
 
 # Callback for yield timeline chart
 @app.callback(
@@ -1189,8 +1311,6 @@ def update_summary_stats(selected_stock, timeframe_years):
             ], width=3),
             dbc.Col([
                 html.H6("📈 Yield Statistics", style={'color': '#FFA500', 'margin-bottom': '15px'}),
-                html.P(f"🎯 Annual Yield (Current): {annual_yield:.1f}%" if annual_yield else "🎯 Annual Yield: Calculating...", 
-                       style={'color': '#00CC96', 'margin-bottom': '5px', 'font-weight': 'bold'}),
                 html.P(f"Average Historical Yield: {avg_yield:.2f}%", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"Highest Yield: {max_yield:.2f}%", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"Lowest Yield: {min_yield:.2f}%", style={'color': '#fff', 'margin-bottom': '5px'}),
@@ -1198,8 +1318,6 @@ def update_summary_stats(selected_stock, timeframe_years):
             ], width=3),
             dbc.Col([
                 html.H6("📊 Payment History", style={'color': '#17A2B8', 'margin-bottom': '15px'}),
-                html.P(f"Annual Dividends (TTM): {currency_symbol}{annual_dividend_total:.3f}", 
-                       style={'color': '#00CC96', 'margin-bottom': '5px', 'font-weight': 'bold'}),
                 html.P(f"Total Payments: {num_payments}", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"Analysis Period: {timeframe_years} years", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"Avg per Year: {num_payments / timeframe_years:.1f}", style={'color': '#fff', 'margin-bottom': '5px'}),
