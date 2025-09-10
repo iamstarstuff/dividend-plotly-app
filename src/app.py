@@ -6,7 +6,8 @@ Enhanced Dividend Analysis App with 4 Dropdown Filters
 4. Timeframe (3, 5, 10 years)
 """
 import dash
-from dash import dcc, html, Input, Output, callback
+from dash import dcc, html, Input, Output, State, callback
+import dash.dependencies
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import plotly.express as px
@@ -18,6 +19,7 @@ import logging
 from typing import List, Dict, Optional
 import os
 import sys
+import yfinance as yf
 
 # Add src directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -53,6 +55,26 @@ app.index_string = '''
             .custom-dropdown .VirtualizedSelectFocusedOption {
                 background-color: #555 !important;
                 color: #fff !important;
+            }
+            
+            /* Custom Input Styling */
+            .custom-input {
+                transition: all 0.3s ease !important;
+            }
+            .custom-input:hover {
+                border-color: #667eea !important;
+                box-shadow: 0 4px 8px rgba(102, 126, 234, 0.15) !important;
+                transform: translateY(-1px) !important;
+            }
+            .custom-input:focus {
+                border-color: #667eea !important;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25), 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+                transform: translateY(-1px) !important;
+                outline: none !important;
+            }
+            .custom-input::placeholder {
+                color: #a0aec0 !important;
+                font-style: italic !important;
             }
         </style>
     </head>
@@ -148,14 +170,49 @@ def load_dividend_data():
 GLOBAL_DIVIDEND_DATA = load_dividend_data()
 logger.info(f"🚀 Startup: Loaded {len(GLOBAL_DIVIDEND_DATA)} records from {len(GLOBAL_DIVIDEND_DATA['ticker_symbol'].unique()) if not GLOBAL_DIVIDEND_DATA.empty else 0} companies")
 
+# Global storage for dynamically fetched stock data
+DYNAMIC_STOCK_DATA = {}
+# Track the last fetched symbol for auto-selection
+LAST_FETCHED_SYMBOL = None
+
+# ====================================================================================================
+# Global storage for dynamically fetched stock data
+DYNAMIC_STOCK_DATA = {}
+# Track the last fetched symbol for auto-selection
+LAST_FETCHED_SYMBOL = None
+
 def get_cached_data():
     """Get cached dividend data (no repeated loading)"""
     return GLOBAL_DIVIDEND_DATA
 
+def get_cached_data_with_dynamic():
+    """Get cached data including any dynamically fetched stocks"""
+    global DYNAMIC_STOCK_DATA
+    
+    # Get the base cached data
+    base_data = get_cached_data()
+    
+    # If no dynamic data, return base data
+    if not DYNAMIC_STOCK_DATA:
+        return base_data
+    
+    # Combine dynamic data with base data
+    dynamic_dfs = []
+    for symbol, data in DYNAMIC_STOCK_DATA.items():
+        dynamic_dfs.append(data)
+    
+    if dynamic_dfs:
+        combined_dynamic = pd.concat(dynamic_dfs, ignore_index=True)
+        # Combine with base data
+        combined_data = pd.concat([combined_dynamic, base_data], ignore_index=True)
+        return combined_data
+    
+    return base_data
+
 def get_enhanced_stock_options():
     """Get stock options from index-based data with automatic daily updates"""
     try:
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         if df.empty:
             return [{'label': 'No Data Available', 'value': 'none'}]
@@ -167,6 +224,9 @@ def get_enhanced_stock_options():
             # High-yield data mappings  
             'ASE': 'USA', 'NGM': 'USA', 'NMS': 'USA', 'NYQ': 'USA',  # NYQ is NASDAQ Global Select (US)
             'PCX': 'Pacific Exchange (USA)', 'TOR': 'Canada',
+            # Indian Stock Exchanges
+            'NSI': 'India',  # National Stock Exchange of India
+            'BSE': 'India',  # Bombay Stock Exchange
             # Additional common exchanges
             'LSE': 'UK', 'ASX': 'Australia', 'JPX': 'Japan', 'HKG': 'Hong Kong',
             'SWX': 'Switzerland', 'FRA': 'Germany', 'AMS': 'Netherlands'
@@ -258,7 +318,7 @@ def get_enhanced_stock_options():
 def get_stock_exchanges():
     """Get unique stock exchanges"""
     try:
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         if df.empty:
             return ['NYSE', 'NASDAQ', 'LSE', 'TSX', 'ASX', 'NSE']  # Default exchanges
@@ -272,7 +332,7 @@ def get_stock_exchanges():
 def get_enhanced_exchange_options():
     """Get exchange options for dropdown with country information"""
     try:
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         if df.empty:
             return [{'label': 'All Exchanges', 'value': 'ALL'}]
@@ -284,6 +344,9 @@ def get_enhanced_exchange_options():
             # High-yield data mappings  
             'ASE': 'USA', 'NGM': 'USA', 'NMS': 'USA', 'NYQ': 'USA',  # NYQ is NASDAQ Global Select (US)
             'PCX': 'Pacific Exchange (USA)', 'TOR': 'Canada',
+            # Indian Stock Exchanges
+            'NSI': 'India',  # National Stock Exchange of India
+            'BSE': 'India',  # Bombay Stock Exchange
             # Additional common exchanges
             'LSE': 'UK', 'ASX': 'Australia', 'JPX': 'Japan', 'HKG': 'Hong Kong',
             'SWX': 'Switzerland', 'FRA': 'Germany', 'AMS': 'Netherlands'
@@ -316,6 +379,189 @@ def get_enhanced_exchange_options():
 stock_options = get_enhanced_stock_options()
 exchange_options = get_enhanced_exchange_options()
 
+def fetch_stock_dividend_data(symbol: str) -> Dict:
+    """
+    Fetch dividend data for a given stock symbol using yfinance
+    Returns a dictionary with status and data/error information
+    """
+    try:
+        # Clean and format the symbol
+        symbol = symbol.strip().upper()
+        
+        # Create yfinance ticker object
+        ticker = yf.Ticker(symbol)
+        
+        # Get basic info first to validate the symbol
+        info = ticker.info
+        if not info or 'symbol' not in info:
+            return {
+                'success': False,
+                'error': f"Stock symbol '{symbol}' not found. Please check the symbol and try again."
+            }
+        
+        # Get dividend data
+        dividends = ticker.dividends
+        if dividends.empty:
+            return {
+                'success': False,
+                'error': f"No dividend data found for '{symbol}'. This stock may not pay dividends."
+            }
+        
+        # Get recent stock price
+        hist = ticker.history(period="5d")
+        current_price = hist['Close'].iloc[-1] if not hist.empty else None
+        
+        # Process dividend data
+        dividend_df = dividends.reset_index()
+        dividend_df.columns = ['dividend_date', 'dividend_per_share']
+        
+        # Calculate yield for each dividend payment
+        dividend_yields = []
+        for _, row in dividend_df.iterrows():
+            div_date = row['dividend_date']
+            div_amount = row['dividend_per_share']
+            
+            # Get stock price around dividend date
+            try:
+                # Convert timezone-aware date to date object for yfinance
+                if hasattr(div_date, 'tz') and div_date.tz is not None:
+                    div_date_naive = div_date.tz_localize(None)
+                else:
+                    div_date_naive = div_date
+                    
+                price_hist = ticker.history(start=div_date_naive - timedelta(days=5), 
+                                          end=div_date_naive + timedelta(days=5))
+                if not price_hist.empty:
+                    price_on_date = price_hist['Close'].iloc[0]
+                    yield_pct = (div_amount / price_on_date) * 100 if price_on_date > 0 else 0
+                else:
+                    yield_pct = 0
+            except Exception as e:
+                logger.warning(f"Could not get price for {symbol} on {div_date}: {e}")
+                yield_pct = 0
+            
+            dividend_yields.append(yield_pct)
+        
+        dividend_df['dividend_yield_pct'] = dividend_yields
+        dividend_df['share_price_on_dividend_date'] = [current_price] * len(dividend_df)
+        
+        # Add metadata
+        company_name = info.get('longName', symbol)
+        exchange = info.get('exchange', 'Unknown')
+        currency = info.get('currency', 'USD')
+        
+        # Map exchange to country using the same mapping as the rest of the app
+        exchange_country_map = {
+            # Index data mappings
+            'NASDAQ': 'USA', 'NYSE': 'USA', 'NSE': 'India', 'TSX': 'Canada',
+            # High-yield data mappings  
+            'ASE': 'USA', 'NGM': 'USA', 'NMS': 'USA', 'NYQ': 'USA',
+            'PCX': 'USA', 'TOR': 'Canada',
+            # Additional common exchanges
+            'LSE': 'UK', 'ASX': 'Australia', 'JPX': 'Japan', 'HKG': 'Hong Kong',
+            'SWX': 'Switzerland', 'FRA': 'Germany', 'AMS': 'Netherlands'
+        }
+        country = exchange_country_map.get(exchange, 'Unknown')
+        
+        dividend_df['ticker_symbol'] = symbol
+        dividend_df['company_name'] = company_name
+        dividend_df['exchange'] = exchange
+        dividend_df['currency'] = currency
+        dividend_df['country'] = country
+        
+        # Filter to last 10 years - handle timezone-aware datetimes
+        ten_years_ago = datetime.now() - timedelta(days=365*10)
+        
+        # Convert dividend_date to timezone-naive for comparison
+        if not dividend_df['dividend_date'].empty:
+            # Check if the dividend_date is timezone-aware
+            if dividend_df['dividend_date'].dt.tz is not None:
+                # Convert to UTC and then remove timezone info for comparison
+                dividend_df['dividend_date'] = dividend_df['dividend_date'].dt.tz_convert('UTC').dt.tz_localize(None)
+        
+        dividend_df = dividend_df[dividend_df['dividend_date'] >= ten_years_ago]
+        
+        if dividend_df.empty:
+            return {
+                'success': False,
+                'error': f"No dividend data found for '{symbol}' in the last 10 years."
+            }
+        
+        logger.info(f"✅ Successfully fetched {len(dividend_df)} dividend records for {symbol}")
+        
+        return {
+            'success': True,
+            'data': dividend_df,
+            'symbol': symbol,
+            'company_name': company_name,
+            'exchange': exchange,
+            'currency': currency,
+            'record_count': len(dividend_df)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching data for {symbol}: {e}")
+        return {
+            'success': False,
+            'error': f"Error fetching data for '{symbol}': {str(e)}"
+        }
+
+# Custom CSS for loading animation
+app.index_string = '''
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        {%favicon%}
+        {%css%}
+        <style>
+            .loading-dots {
+                display: inline-flex;
+                align-items: center;
+                color: #FFA500;
+            }
+            
+            .loading-dots::after {
+                content: "●●●";
+                animation: loading 1.5s infinite;
+                margin-left: 5px;
+            }
+            
+            @keyframes loading {
+                0% { content: "●○○"; }
+                33% { content: "○●○"; }
+                66% { content: "○○●"; }
+                100% { content: "●○○"; }
+            }
+            
+            .loading-spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #FFA500;
+                border-radius: 50%;
+                border-top-color: transparent;
+                animation: spin 1s linear infinite;
+                margin-right: 8px;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+'''
+
 # App layout with enhanced 4-dropdown design
 app.layout = dbc.Container([
     # Header
@@ -324,6 +570,86 @@ app.layout = dbc.Container([
             html.H1("🌍 Global Dividend Analysis Dashboard", 
                    className="text-center mb-4",
                    style={'color': '#fff', 'font-weight': 'bold'})
+        ])
+    ]),
+    
+    # Usage Guide (Collapsible)
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    dbc.Button(
+                        [
+                            html.I(className="fas fa-question-circle", style={'margin-right': '8px'}),
+                            "📖 How to Use This Dashboard",
+                            html.I(id="usage-guide-icon", className="fas fa-chevron-down", style={'margin-left': '10px', 'float': 'right'})
+                        ],
+                        id="usage-guide-toggle",
+                        color="info",
+                        outline=True,
+                        size="sm",
+                        style={'width': '100%', 'text-align': 'left'}
+                    )
+                ], style={'padding': '10px', 'background-color': '#2c3e50'}),
+                dbc.Collapse([
+                    dbc.CardBody([
+                        html.Div([
+                            html.H5("🎯 Quick Start Guide", style={'color': '#3498db', 'margin-bottom': '15px'}),
+                            
+                            html.Div([
+                                html.H6("📊 1. Browse Existing Data", style={'color': '#e74c3c', 'margin-bottom': '8px'}),
+                                html.Ul([
+                                    html.Li("Use the dropdown filters to explore 200+ pre-loaded stocks"),
+                                    html.Li("Filter by Exchange (USA 🇺🇸, India 🇮🇳, Canada 🇨🇦, etc.)"),
+                                    html.Li("Filter by Average Yield Range (e.g., 2-4%, 4-6%)"),
+                                    html.Li("Select time period for analysis (3, 5, or 10 years)")
+                                ], style={'margin-bottom': '15px'})
+                            ]),
+                            
+                            html.Div([
+                                html.H6("🔍 2. Add New Stocks", style={'color': '#e74c3c', 'margin-bottom': '8px'}),
+                                html.Ul([
+                                    html.Li("Type any stock symbol (AAPL, MSFT, TSLA, etc.) in the text box"),
+                                    html.Li("Click 'Fetch Data' to get real-time dividend information"),
+                                    html.Li("New stocks are automatically added to your dropdown"),
+                                    html.Li("Supports global markets: US (.N/A), India (.NS), Canada (.TO)")
+                                ], style={'margin-bottom': '15px'})
+                            ]),
+                            
+                            html.Div([
+                                html.H6("📈 3. Analyze the Charts", style={'color': '#e74c3c', 'margin-bottom': '8px'}),
+                                html.Ul([
+                                    html.Li("Main Chart: See dividend trends over time with yield percentages"),
+                                    html.Li("Key Metrics Panel: View current yield, total dividends, and consistency score"),
+                                    html.Li("Historical Data: Track dividend growth and payment patterns"),
+                                    html.Li("Hover over data points for detailed information")
+                                ], style={'margin-bottom': '15px'})
+                            ]),
+                            
+                            html.Hr(style={'margin': '20px 0', 'border-color': '#34495e'}),
+                            
+                            html.Div([
+                                html.H6("💡 Pro Tips", style={'color': '#f39c12', 'margin-bottom': '10px'}),
+                                html.Ul([
+                                    html.Li("🔄 Try different time periods to see long-term vs short-term trends"),
+                                    html.Li("🌍 Compare dividend yields across different countries and exchanges"),
+                                    html.Li("📊 Use the yield range filter to find high-dividend stocks"),
+                                    html.Li("⚡ Charts update automatically when you change selections"),
+                                    html.Li("💾 Your added stocks persist during the session")
+                                ], style={'margin-bottom': '10px'})
+                            ]),
+                            
+                            html.Div([
+                                html.Small([
+                                    "💭 ",
+                                    html.Strong("Remember: "),
+                                    "This dashboard shows historical data for analysis. Always verify information with official sources before making investment decisions."
+                                ], style={'color': '#95a5a6', 'font-style': 'italic'})
+                            ])
+                        ])
+                    ])
+                ], id="usage-guide-collapse", is_open=False)
+            ], style={'margin-bottom': '20px', 'background-color': '#34495e', 'border': 'none'})
         ])
     ]),
     
@@ -416,6 +742,58 @@ app.layout = dbc.Container([
                     html.P(f"📊 {len([opt for opt in stock_options if not opt.get('disabled')])} stocks available", 
                            style={'color': '#00CC96', 'font-size': '0.9em'})
                 ], width=3)
+            ]),
+            
+            # Second row: Manual Stock Symbol Input
+            html.Hr(style={'border-color': '#555', 'margin': '15px 0'}),
+            dbc.Row([
+                dbc.Col([
+                    html.Label("🔍 Add New Stock Symbol:", style={'color': '#fff', 'font-weight': 'bold'}),
+                    html.P("Enter any stock symbol to fetch its dividend data dynamically", 
+                           style={'color': '#888', 'font-size': '0.85em', 'margin-bottom': '5px'})
+                ], width=3),
+                
+                dbc.Col([
+                    dcc.Input(
+                        id='manual-stock-input',
+                        type='text',
+                        value='',
+                        placeholder='🔍 Enter stock symbol (e.g., AAPL, MSFT, GOOGL)',
+                        style={
+                            'width': '100%', 
+                            'height': '42px',
+                            'backgroundColor': '#2b3440', 
+                            'color': '#fff', 
+                            'border': '2px solid #4a5568',
+                            'borderRadius': '8px',
+                            'padding': '0 15px',
+                            'fontSize': '14px',
+                            'fontWeight': '500',
+                            'outline': 'none',
+                            'transition': 'all 0.3s ease',
+                            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                        },
+                        className='custom-input'
+                    )
+                ], width=3),
+                
+                dbc.Col([
+                    dbc.Button(
+                        "🚀 Fetch Data",
+                        id='fetch-stock-btn',
+                        color='success',
+                        style={'width': '100%'}
+                    )
+                ], width=2),
+                
+                dbc.Col([
+                    dcc.Loading(
+                        id="loading-fetch",
+                        type="default",
+                        children=html.Div(id='fetch-status', style={'color': '#fff', 'padding-top': '8px'}),
+                        style={'color': '#FFA500'}
+                    )
+                ], width=4)
             ])
         ])
     ], style={'backgroundColor': '#333', 'border': '1px solid #555', 'margin-bottom': '20px'}),
@@ -635,13 +1013,14 @@ app.index_string = '''
 @app.callback(
     Output('stock-dropdown', 'options'),
     [Input('exchange-dropdown', 'value'),
-     Input('yield-dropdown', 'value')]
+     Input('yield-dropdown', 'value'),
+     Input('fetch-status', 'children')]
 )
-def update_stock_dropdown(selected_exchange, selected_yield):
+def update_stock_dropdown(selected_exchange, selected_yield, fetch_status):
     """Update stock dropdown based on exchange and yield filters"""
     try:
-        # Use cached data instead of loading repeatedly
-        df = get_cached_data()
+        # Use cached data with dynamic data instead of loading repeatedly
+        df = get_cached_data_with_dynamic()
         
         if df.empty:
             return [{'label': 'No Data Available', 'value': 'none'}]
@@ -653,6 +1032,9 @@ def update_stock_dropdown(selected_exchange, selected_yield):
             # High-yield data mappings  
             'ASE': 'USA', 'NGM': 'USA', 'NMS': 'USA', 'NYQ': 'USA',  # NYQ is NASDAQ Global Select (US)
             'PCX': 'Pacific Exchange (USA)', 'TOR': 'Canada',
+            # Indian Stock Exchanges
+            'NSI': 'India',  # National Stock Exchange of India
+            'BSE': 'India',  # Bombay Stock Exchange
             # Additional common exchanges
             'LSE': 'UK', 'ASX': 'Australia', 'JPX': 'Japan', 'HKG': 'Hong Kong',
             'SWX': 'Switzerland', 'FRA': 'Germany', 'AMS': 'Netherlands'
@@ -769,8 +1151,8 @@ def update_stock_info(selected_stock):
         return html.P("Select a stock to view information", style={'color': '#888'})
     
     try:
-        # Use the same merged data as the main app (GLOBAL_DIVIDEND_DATA)
-        df = GLOBAL_DIVIDEND_DATA.copy()
+        # Use the cached data with dynamic data
+        df = get_cached_data_with_dynamic()
         
         # Filter for selected stock
         stock_data = df[df['ticker_symbol'] == selected_stock]
@@ -855,8 +1237,8 @@ def update_key_metrics(selected_stock, timeframe_years):
         ])
     
     try:
-        # Use cached data
-        df = get_cached_data()
+        # Use cached data including dynamic stocks
+        df = get_cached_data_with_dynamic()
         
         # Filter for selected stock
         stock_data = df[df['ticker_symbol'] == selected_stock].copy()
@@ -976,7 +1358,7 @@ def update_yield_timeline(selected_stock, timeframe_years):
     
     try:
         # Use cached data instead of loading repeatedly
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         # Filter for selected stock and timeframe
         stock_data = df[df['ticker_symbol'] == selected_stock].copy()
@@ -1070,7 +1452,7 @@ def update_dividend_amount_chart(selected_stock, timeframe_years):
     
     try:
         # Use cached data instead of loading repeatedly
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         # Filter for selected stock and timeframe
         stock_data = df[df['ticker_symbol'] == selected_stock].copy()
@@ -1246,7 +1628,7 @@ def update_summary_stats(selected_stock, timeframe_years):
     
     try:
         # Use cached data instead of loading repeatedly
-        df = get_cached_data()
+        df = get_cached_data_with_dynamic()
         
         # Filter for selected stock and timeframe
         stock_data = df[df['ticker_symbol'] == selected_stock].copy()
@@ -1338,6 +1720,101 @@ def update_summary_stats(selected_stock, timeframe_years):
         logger.error(f"Error calculating summary stats: {e}")
         return html.P(f"Error calculating statistics: {str(e)}", style={'color': '#ff6b6b'})
 
+# Callback for manual stock symbol fetching
+@app.callback(
+    [Output('fetch-status', 'children'),
+     Output('manual-stock-input', 'value')],
+    [Input('fetch-stock-btn', 'n_clicks')],
+    [dash.dependencies.State('manual-stock-input', 'value')]
+)
+def fetch_new_stock_data(n_clicks, stock_symbol):
+    """Handle manual stock symbol input and fetch its dividend data"""
+    global DYNAMIC_STOCK_DATA, LAST_FETCHED_SYMBOL
+    
+    if n_clicks is None or not stock_symbol:
+        # Return current state without changes
+        return ("", "")
+    
+    try:
+        # Clean the symbol (in case it's typed manually)
+        symbol = str(stock_symbol).strip().upper()
+        
+        # Fetch the stock data
+        result = fetch_stock_dividend_data(symbol)
+        
+        if result['success']:
+            # Store the fetched data globally
+            symbol = result['symbol']
+            DYNAMIC_STOCK_DATA[symbol] = result['data']
+            LAST_FETCHED_SYMBOL = symbol  # Store for auto-selection
+            
+            # Success status with enhanced animation
+            status_success = html.Div([
+                html.I(className="fas fa-check-circle", style={'margin-right': '8px', 'color': '#00CC96'}),
+                html.Span(f"✅ Successfully fetched {result['record_count']} dividend records for {symbol}!", 
+                         style={'color': '#00CC96', 'font-weight': 'bold'})
+            ], style={'display': 'flex', 'align-items': 'center'})
+            
+            return status_success, None  # Clear input
+            
+        else:
+            # Error status
+            status_error = html.Div([
+                html.I(className="fas fa-exclamation-triangle", style={'margin-right': '8px', 'color': '#ff6b6b'}),
+                html.Span(result['error'], style={'color': '#ff6b6b'})
+            ], style={'display': 'flex', 'align-items': 'center'})
+            
+            return status_error, stock_symbol  # Keep input for retry
+            
+    except Exception as e:
+        logger.error(f"Error in fetch callback: {e}")
+        status_error = html.Div([
+            html.I(className="fas fa-exclamation-triangle", style={'margin-right': '8px', 'color': '#ff6b6b'}),
+            html.Span(f"❌ Error: {str(e)}", style={'color': '#ff6b6b'})
+        ], style={'display': 'flex', 'align-items': 'center'})
+        
+        return status_error, stock_symbol
+
+# Auto-selection callback - triggered when stock dropdown options are updated
+@app.callback(
+    Output('stock-dropdown', 'value'),
+    [Input('stock-dropdown', 'options')]
+)
+def auto_select_fetched_stock(dropdown_options):
+    """Auto-select the newly fetched stock in the dropdown"""
+    global LAST_FETCHED_SYMBOL
+    
+    if not LAST_FETCHED_SYMBOL or not dropdown_options:
+        return dash.no_update
+    
+    # Check if the last fetched symbol is now available in dropdown options
+    available_symbols = [opt['value'] for opt in dropdown_options if not opt.get('disabled')]
+    
+    if LAST_FETCHED_SYMBOL in available_symbols:
+        symbol_to_select = LAST_FETCHED_SYMBOL
+        LAST_FETCHED_SYMBOL = None  # Clear after using
+        logger.info(f"🎯 Auto-selecting fetched stock: {symbol_to_select}")
+        return symbol_to_select
+    
+    return dash.no_update
+
+# Callback for usage guide toggle
+@app.callback(
+    [Output('usage-guide-collapse', 'is_open'),
+     Output('usage-guide-icon', 'className')],
+    [Input('usage-guide-toggle', 'n_clicks')],
+    [State('usage-guide-collapse', 'is_open')]
+)
+def toggle_usage_guide(n_clicks, is_open):
+    """Toggle the usage guide visibility and update the icon"""
+    if n_clicks:
+        new_state = not is_open
+        icon_class = "fas fa-chevron-up" if new_state else "fas fa-chevron-down"
+        return new_state, icon_class
+    
+    return is_open, "fas fa-chevron-down"
+
+# Modified get_cached_data function to include dynamic data
 if __name__ == '__main__':
     # For deployment on Render or other cloud platforms
     port = int(os.environ.get('PORT', 8050))
