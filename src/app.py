@@ -932,75 +932,90 @@ app.index_string = '''
                 font-style: italic !important;
             }
 
-            /* ===== NUCLEAR dark-theme for Dash dropdowns ===== */
-            /* Force dark bg on EVERY element inside .dash-dropdown
-               regardless of react-select version or class names. */
+            /* ===== Dropdown dark-theme ===== */
+            /* Use .custom-dropdown (explicitly set by us) + global
+               element selectors as ultimate fallback. Black text
+               ensures readability on ANY background. */
 
+            .custom-dropdown,
             .dash-dropdown {
                 font-size: 14px !important;
             }
 
-            /* Every div inside a dropdown: dark background */
+            .custom-dropdown div,
             .dash-dropdown div {
                 background-color: #444 !important;
-                color: #fff !important;
+                color: #000 !important;
                 border-color: #666 !important;
             }
 
-            /* Every input inside a dropdown: transparent bg, white text */
+            .custom-dropdown input,
             .dash-dropdown input {
-                color: #fff !important;
+                color: #000 !important;
                 background-color: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
             }
 
-            /* Every span inside a dropdown: white text */
+            .custom-dropdown span,
             .dash-dropdown span {
-                color: #fff !important;
+                color: #000 !important;
             }
 
-            /* Placeholder text: dimmer */
-            .dash-dropdown .Select-placeholder,
-            .dash-dropdown [class*="placeholder"] {
-                color: #aaa !important;
-            }
-
-            /* Indicators (clear X, dropdown arrow): transparent bg */
+            .custom-dropdown svg,
             .dash-dropdown svg {
-                fill: #aaa !important;
+                fill: #999 !important;
             }
+
+            .custom-dropdown .Select-arrow,
             .dash-dropdown .Select-arrow {
-                border-color: #aaa transparent transparent !important;
-            }
-            .dash-dropdown [class*="indicatorSeparator"] {
-                background-color: #666 !important;
+                border-color: #999 transparent transparent !important;
             }
 
             /* Dropdown menu z-index */
+            .custom-dropdown .Select-menu-outer,
             .dash-dropdown .Select-menu-outer,
+            .custom-dropdown [class*="menu"],
             .dash-dropdown [class*="menu"] {
                 z-index: 9999 !important;
             }
 
             /* Hovered option */
+            .custom-dropdown .VirtualizedSelectFocusedOption,
+            .custom-dropdown .Select-option.is-focused,
+            .custom-dropdown .Select-option:hover,
+            .custom-dropdown div:hover,
             .dash-dropdown .VirtualizedSelectFocusedOption,
             .dash-dropdown .Select-option.is-focused,
-            .dash-dropdown .Select-option:hover,
-            .dash-dropdown div[class*="option"]:hover {
+            .dash-dropdown .Select-option:hover {
                 background-color: #555 !important;
-                color: #fff !important;
             }
 
             /* Selected option */
+            .custom-dropdown .Select-option.is-selected,
             .dash-dropdown .Select-option.is-selected {
                 background-color: #00CC96 !important;
             }
 
             /* Disabled option (exchange headers) */
+            .custom-dropdown .Select-option.is-disabled,
             .dash-dropdown .Select-option.is-disabled {
                 background-color: #333 !important;
                 color: #888 !important;
+            }
+
+            /* GLOBAL FALLBACK: target ALL inputs/selects in the page body */
+            #stock-dropdown input,
+            #exchange-dropdown input,
+            #yield-dropdown input,
+            #timeframe-dropdown input,
+            #manual-stock-input input {
+                color: #000 !important;
+            }
+            #stock-dropdown div,
+            #exchange-dropdown div,
+            #yield-dropdown div,
+            #timeframe-dropdown div,
+            #manual-stock-input div {
+                color: #000 !important;
             }
         </style>
     </head>
