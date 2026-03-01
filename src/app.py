@@ -676,7 +676,6 @@ app.layout = dbc.Container([
                         options=stock_options,
                         value=stock_options[0]['value'] if stock_options and not stock_options[0].get('disabled') else None,
                         placeholder="Search for a stock...",
-                        style={'backgroundColor': '#333', 'color': '#fff'},
                         className='custom-dropdown'
                     )
                 ], width=3),
@@ -688,7 +687,6 @@ app.layout = dbc.Container([
                         id='exchange-dropdown',
                         options=exchange_options,
                         value='ALL',
-                        style={'backgroundColor': '#333', 'color': '#fff'},
                         className='custom-dropdown'
                     )
                 ], width=2),
@@ -706,7 +704,6 @@ app.layout = dbc.Container([
                             {'label': 'Above 10%', 'value': '10+'}
                         ],
                         value='ANY',
-                        style={'backgroundColor': '#333', 'color': '#fff'},
                         className='custom-dropdown'
                     )
                 ], width=2),
@@ -722,7 +719,6 @@ app.layout = dbc.Container([
                             {'label': 'Last 3 Years', 'value': 3}
                         ],
                         value=10,
-                        style={'backgroundColor': '#333', 'color': '#fff'},
                         className='custom-dropdown'
                     )
                 ], width=2),
@@ -752,7 +748,6 @@ app.layout = dbc.Container([
                         value=None,
                         placeholder='Type a stock name or symbol (e.g., SBIN, Apple, MSFT)...',
                         searchable=True,
-                        style={'backgroundColor': '#333', 'color': '#fff'},
                         className='custom-dropdown'
                     )
                 ], width=4),
@@ -937,110 +932,75 @@ app.index_string = '''
                 font-style: italic !important;
             }
 
-            /* ===== Dash Dropdown dark-theme ===== */
-            /* Target EVERY possible element inside dropdown wrappers.
-               Covers react-select v1 (.Select-*), v5 (css-*-control),
-               and raw HTML elements. */
+            /* ===== NUCLEAR dark-theme for Dash dropdowns ===== */
+            /* Force dark bg on EVERY element inside .dash-dropdown
+               regardless of react-select version or class names. */
 
             .dash-dropdown {
                 font-size: 14px !important;
             }
 
-            /* --- Control / wrapper --- */
-            .dash-dropdown .Select-control,
-            .dash-dropdown [class*="-control"] {
+            /* Every div inside a dropdown: dark background */
+            .dash-dropdown div {
                 background-color: #444 !important;
+                color: #fff !important;
                 border-color: #666 !important;
-                color: #fff !important;
             }
 
-            /* --- Any input inside a dropdown --- */
-            .dash-dropdown input,
-            .dash-dropdown .Select-input > input,
-            .dash-dropdown [class*="-Input"] input {
+            /* Every input inside a dropdown: transparent bg, white text */
+            .dash-dropdown input {
                 color: #fff !important;
                 background-color: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
             }
 
-            /* --- Selected value text --- */
-            .dash-dropdown .Select-value-label,
-            .dash-dropdown [class*="-singleValue"],
-            .dash-dropdown [class*="-multiValue"] {
+            /* Every span inside a dropdown: white text */
+            .dash-dropdown span {
                 color: #fff !important;
-                font-weight: bold !important;
             }
 
-            /* --- Placeholder --- */
+            /* Placeholder text: dimmer */
             .dash-dropdown .Select-placeholder,
-            .dash-dropdown [class*="-placeholder"] {
+            .dash-dropdown [class*="placeholder"] {
                 color: #aaa !important;
             }
 
-            /* --- Value container --- */
-            .dash-dropdown [class*="-ValueContainer"],
-            .dash-dropdown [class*="-valueContainer"],
-            .dash-dropdown .Select-multi-value-wrapper {
-                background-color: #444 !important;
-                color: #fff !important;
-            }
-
-            /* --- Indicators (clear X / arrow) --- */
-            .dash-dropdown .Select-clear-zone,
-            .dash-dropdown .Select-arrow-zone,
-            .dash-dropdown [class*="-indicatorContainer"],
-            .dash-dropdown [class*="-IndicatorContainer"] {
-                color: #aaa !important;
-                background-color: transparent !important;
+            /* Indicators (clear X, dropdown arrow): transparent bg */
+            .dash-dropdown svg {
+                fill: #aaa !important;
             }
             .dash-dropdown .Select-arrow {
                 border-color: #aaa transparent transparent !important;
             }
-            .dash-dropdown [class*="-indicatorSeparator"] {
+            .dash-dropdown [class*="indicatorSeparator"] {
                 background-color: #666 !important;
             }
 
-            /* --- Dropdown menu (opened) --- */
+            /* Dropdown menu z-index */
             .dash-dropdown .Select-menu-outer,
-            .dash-dropdown [class*="-menu"] {
-                background-color: #444 !important;
-                border-color: #666 !important;
+            .dash-dropdown [class*="menu"] {
                 z-index: 9999 !important;
             }
-            .dash-dropdown [class*="-MenuList"],
-            .dash-dropdown [class*="-menuList"] {
-                background-color: #444 !important;
-            }
 
-            /* --- Options --- */
-            .dash-dropdown .VirtualizedSelectOption,
-            .dash-dropdown .Select-option,
-            .dash-dropdown [class*="-option"] {
-                background-color: #444 !important;
-                color: #fff !important;
-                padding: 8px 12px !important;
-            }
+            /* Hovered option */
             .dash-dropdown .VirtualizedSelectFocusedOption,
             .dash-dropdown .Select-option.is-focused,
             .dash-dropdown .Select-option:hover,
-            .dash-dropdown [class*="-option"]:hover {
+            .dash-dropdown div[class*="option"]:hover {
                 background-color: #555 !important;
                 color: #fff !important;
             }
+
+            /* Selected option */
             .dash-dropdown .Select-option.is-selected {
                 background-color: #00CC96 !important;
-                color: #fff !important;
             }
+
+            /* Disabled option (exchange headers) */
             .dash-dropdown .Select-option.is-disabled {
                 background-color: #333 !important;
                 color: #888 !important;
-            }
-
-            /* --- Override Bootstrap .form-control inside dropdowns --- */
-            .dash-dropdown .form-control,
-            .dash-dropdown input.form-control {
-                background-color: #444 !important;
-                color: #fff !important;
-                border-color: #666 !important;
             }
         </style>
     </head>
