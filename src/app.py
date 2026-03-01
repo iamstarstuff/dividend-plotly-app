@@ -16,9 +16,11 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import logging
+import threading
 from typing import List, Dict, Optional
 import os
 import sys
+import requests
 import yfinance as yf
 
 # Add src directory to path
@@ -92,90 +94,118 @@ app.index_string = '''
 # Initialize data loader and load data once at startup
 data_loader = DataLoader()
 
-# Load data once at startup
-def load_dividend_data():
-    """Unified function to load dividend data with automatic updates"""
+# ── Background update state ──
+_UPDATE_STATUS = {
+    'running': False,
+    'finished': False,
+    'error': None,
+    'last_updated': None,   # date string of loaded data
+    'needs_update': False,  # True when existing data is stale
+}
+_update_lock = threading.Lock()
+
+
+def _load_csvs():
+    """Load existing CSV files and merge them (no network calls)."""
+    high_yield_csv = os.path.join(os.path.dirname(__file__), 'data',
+                                  'focused_high_yield_dividends_20250906_215020.csv')
+    index_csv = os.path.join(os.path.dirname(__file__), 'data',
+                             'index_dividend_data.csv')
+
+    datasets = []
+    if os.path.exists(high_yield_csv):
+        df = pd.read_csv(high_yield_csv)
+        df['data_source'] = 'high_yield_discovery'
+        datasets.append(df)
+    if os.path.exists(index_csv):
+        df = pd.read_csv(index_csv)
+        df['data_source'] = 'index_based'
+        datasets.append(df)
+
+    if datasets:
+        combined = pd.concat(datasets, ignore_index=True)
+        combined = combined.drop_duplicates(
+            subset=['ticker_symbol', 'dividend_date'], keep='first')
+        return combined
+    return pd.DataFrame()
+
+
+def _background_update():
+    """Run in a daemon thread: fetch fresh data, then swap cache."""
+    global GLOBAL_DIVIDEND_DATA
     try:
-        # Check for HIGH-YIELD data first (our new discovery)
-        high_yield_csv = os.path.join(os.path.dirname(__file__), 'data', 'focused_high_yield_dividends_20250906_215020.csv')
-        
-        # Check for index-based data file (fallback)
-        index_csv = os.path.join(os.path.dirname(__file__), 'data', 'index_dividend_data.csv')
-        
-        # Always load both datasets and merge for complete coverage
-        datasets_to_merge = []
-        
-        if os.path.exists(high_yield_csv):
-            logger.info("✅ Loading HIGH-YIELD dividend data (global discovery)")
-            high_yield_df = pd.read_csv(high_yield_csv)
-            high_yield_df['data_source'] = 'high_yield_discovery'
-            datasets_to_merge.append(high_yield_df)
-            
-        if os.path.exists(index_csv):
-            logger.info("✅ Loading INDEX-based dividend data (comprehensive coverage)")
-            index_df = pd.read_csv(index_csv)
-            index_df['data_source'] = 'index_based'
-            datasets_to_merge.append(index_df)
-        
-        if datasets_to_merge:
-            # Combine all available datasets
-            combined_df = pd.concat(datasets_to_merge, ignore_index=True)
-            
-            # Remove duplicates, keeping high-yield version first
-            combined_df = combined_df.drop_duplicates(
-                subset=['ticker_symbol', 'dividend_date'], 
-                keep='first'
-            )
-            
-            logger.info(f"📊 Merged dividend database: {len(combined_df)} records from {len(combined_df['ticker_symbol'].unique())} companies")
-            
-            # Count data sources
-            high_yield_count = len(combined_df[combined_df.get('data_source', '') == 'high_yield_discovery']['ticker_symbol'].unique())
-            index_count = len(combined_df[combined_df.get('data_source', '') == 'index_based']['ticker_symbol'].unique())
-            logger.info(f"🔥 {high_yield_count} high-yield discoveries + 📊 {index_count} index companies")
-            
-            return combined_df
-        
-        logger.warning("⚠️ No dividend data files found - using fallback data loader")
-        
-        # Check if data needs updating and update if necessary
-        if not check_data_freshness(index_csv):
-            logger.info("🔄 Data needs updating - fetching fresh data...")
-            try:
-                update_data()
-            except Exception as e:
-                logger.warning(f"⚠️ Auto-update failed: {e}, using existing data")
-        
-        # Load the data (priority: index_data -> exchange_data -> data_loader)
-        if os.path.exists(index_csv):
-            return pd.read_csv(index_csv)
-        
-        # Fallback to old exchange data
-        exchange_csv = os.path.join(os.path.dirname(__file__), 'data', 'exchange_dividend_data.csv')
-        if os.path.exists(exchange_csv):
-            return pd.read_csv(exchange_csv)
-        
-        # Last resort: data loader
-        return data_loader.load_data()
-        
+        with _update_lock:
+            _UPDATE_STATUS['running'] = True
+            _UPDATE_STATUS['finished'] = False
+            _UPDATE_STATUS['error'] = None
+
+        logger.info("🔄 Background update started — fetching latest dividend data...")
+        update_data()  # writes index_dividend_data.csv
+        logger.info("✅ Background update: CSV written, reloading cache...")
+
+        fresh_df = _load_csvs()
+        if not fresh_df.empty:
+            GLOBAL_DIVIDEND_DATA = fresh_df
+            logger.info(f"✅ Cache refreshed: {len(fresh_df)} records, "
+                        f"{fresh_df['ticker_symbol'].nunique()} companies")
+
+        with _update_lock:
+            _UPDATE_STATUS['running'] = False
+            _UPDATE_STATUS['finished'] = True
+            _UPDATE_STATUS['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M')
     except Exception as e:
-        logger.error(f"❌ Error loading data: {e}")
-        # Ultimate fallback
+        logger.error(f"❌ Background update failed: {e}")
+        with _update_lock:
+            _UPDATE_STATUS['running'] = False
+            _UPDATE_STATUS['finished'] = True
+            _UPDATE_STATUS['error'] = str(e)
+
+
+def load_dividend_data():
+    """Load existing CSVs instantly. If stale, kick off a background refresh."""
+    index_csv = os.path.join(os.path.dirname(__file__), 'data',
+                             'index_dividend_data.csv')
+
+    combined = _load_csvs()
+    if not combined.empty:
+        n_records = len(combined)
+        n_tickers = combined['ticker_symbol'].nunique()
+        logger.info(f"📊 Loaded {n_records} records from {n_tickers} companies")
+
+    # Determine staleness
+    data_is_stale = not check_data_freshness(index_csv)
+    _UPDATE_STATUS['needs_update'] = data_is_stale
+
+    if data_is_stale:
+        # Figure out last-updated date for display
+        try:
+            tmp = pd.read_csv(index_csv, usecols=['last_updated'], nrows=1)
+            _UPDATE_STATUS['last_updated'] = tmp['last_updated'].iloc[0]
+        except Exception:
+            _UPDATE_STATUS['last_updated'] = 'unknown'
+
+        logger.info("🔄 Data is stale — scheduling background update")
+        t = threading.Thread(target=_background_update, daemon=True)
+        t.start()
+    else:
+        _UPDATE_STATUS['finished'] = True
+        _UPDATE_STATUS['last_updated'] = datetime.now().strftime('%Y-%m-%d')
+
+    if combined.empty:
+        logger.warning("⚠️ No CSV files found — falling back to data_loader")
         try:
             return data_loader.load_data()
-        except:
+        except Exception:
             return pd.DataFrame()
 
-# Load data once at startup - cache it globally
+    return combined
+
+
+# Load data once at startup — instant (reads local CSVs only)
 GLOBAL_DIVIDEND_DATA = load_dividend_data()
-logger.info(f"🚀 Startup: Loaded {len(GLOBAL_DIVIDEND_DATA)} records from {len(GLOBAL_DIVIDEND_DATA['ticker_symbol'].unique()) if not GLOBAL_DIVIDEND_DATA.empty else 0} companies")
+logger.info(f"🚀 Startup: Loaded {len(GLOBAL_DIVIDEND_DATA)} records from "
+            f"{GLOBAL_DIVIDEND_DATA['ticker_symbol'].nunique() if not GLOBAL_DIVIDEND_DATA.empty else 0} companies")
 
-# Global storage for dynamically fetched stock data
-DYNAMIC_STOCK_DATA = {}
-# Track the last fetched symbol for auto-selection
-LAST_FETCHED_SYMBOL = None
-
-# ====================================================================================================
 # Global storage for dynamically fetched stock data
 DYNAMIC_STOCK_DATA = {}
 # Track the last fetched symbol for auto-selection
@@ -379,6 +409,75 @@ def get_enhanced_exchange_options():
 stock_options = get_enhanced_stock_options()
 exchange_options = get_enhanced_exchange_options()
 
+def search_yahoo_symbols(query: str) -> list:
+    """Search Yahoo Finance for stock symbols matching a query.
+    Returns a list of dcc.Dropdown options with exchange info."""
+    if not query or len(query) < 1:
+        return []
+    try:
+        url = "https://query2.finance.yahoo.com/v1/finance/search"
+        params = {
+            'q': query,
+            'quotesCount': 15,
+            'newsCount': 0,
+            'enableFuzzyQuery': True,
+            'quotesQueryId': 'tss_match_phrase_query',
+        }
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        data = resp.json()
+        quotes = data.get('quotes', [])
+
+        # Exchange display name mapping
+        exchange_display = {
+            'NSI': 'NSE (India)', 'BSE': 'BSE (India)', 'BOM': 'BSE (India)',
+            'NSE': 'NSE (India)',
+            'NMS': 'NASDAQ', 'NGM': 'NASDAQ', 'NCM': 'NASDAQ',
+            'NYQ': 'NYSE', 'ASE': 'NYSE American',
+            'TOR': 'TSX (Canada)', 'TSX': 'TSX (Canada)',
+            'LSE': 'LSE (UK)', 'LON': 'LSE (UK)',
+            'ASX': 'ASX (Australia)', 'HKG': 'HKSE (Hong Kong)',
+            'JPX': 'JPX (Japan)', 'FRA': 'Frankfurt (Germany)',
+            'SWX': 'SIX (Switzerland)', 'AMS': 'Euronext (Netherlands)',
+            'PCX': 'NYSE Arca',
+        }
+        # Country flag mapping
+        exchange_flags = {
+            'NSI': '🇮🇳', 'BSE': '🇮🇳', 'BOM': '🇮🇳', 'NSE': '🇮🇳',
+            'NMS': '🇺🇸', 'NGM': '🇺🇸', 'NCM': '🇺🇸', 'NYQ': '🇺🇸',
+            'ASE': '🇺🇸', 'PCX': '🇺🇸',
+            'TOR': '🇨🇦', 'TSX': '🇨🇦',
+            'LSE': '🇬🇧', 'LON': '🇬🇧',
+            'ASX': '🇦🇺', 'HKG': '🇭🇰',
+            'JPX': '🇯🇵', 'FRA': '🇩🇪',
+            'SWX': '🇨🇭', 'AMS': '🇳🇱',
+        }
+
+        options = []
+        seen = set()
+        for q in quotes:
+            symbol = q.get('symbol', '')
+            name = q.get('shortname') or q.get('longname') or symbol
+            exchange = q.get('exchange', '')
+            quote_type = q.get('quoteType', '')
+
+            # Only include equities / ETFs
+            if quote_type not in ('EQUITY', 'ETF', ''):
+                continue
+            if symbol in seen:
+                continue
+            seen.add(symbol)
+
+            flag = exchange_flags.get(exchange, '🌍')
+            exch_name = exchange_display.get(exchange, exchange)
+            label = f"{flag} {symbol} — {name[:40]} [{exch_name}]"
+            options.append({'label': label, 'value': symbol})
+
+        return options
+    except Exception as e:
+        logger.warning(f"Yahoo search failed for '{query}': {e}")
+        return []
+
 def fetch_stock_dividend_data(symbol: str) -> Dict:
     """
     Fetch dividend data for a given stock symbol using yfinance
@@ -564,6 +663,12 @@ app.index_string = '''
 
 # App layout with enhanced 4-dropdown design
 app.layout = dbc.Container([
+    # Hidden interval to poll background update status (every 5 s while updating)
+    dcc.Interval(id='update-poll-interval', interval=5_000, n_intervals=0),
+
+    # Data-update status banner (shown while background update is running)
+    html.Div(id='data-update-banner'),
+
     # Header
     dbc.Row([
         dbc.Col([
@@ -645,27 +750,24 @@ app.layout = dbc.Container([
                                     html.Strong("Remember: "),
                                     "This dashboard shows historical data for analysis. Always verify information with official sources before making investment decisions."
                                 ], style={'color': '#95a5a6', 'font-style': 'italic'})
-                            ])
+                            ]),
+                            
+                            # Disclaimer (inside collapsible guide)
+                            html.Hr(style={'margin': '20px 0', 'border-color': '#34495e'}),
+                            dbc.Alert([
+                                html.H5("⚠️ Important Disclaimer", style={'color': '#856404', 'margin-bottom': '10px'}),
+                                html.P([
+                                    "The data presented in this dashboard is for informational purposes only and should ",
+                                    html.Strong("not be considered ground truth"), 
+                                    ". Investment decisions should ",
+                                    html.Strong("never"), 
+                                    " be made solely based on the values shown here. Always verify all financial data with reliable, official sources before making any investment decisions. Past performance does not guarantee future results."
+                                ], style={'margin-bottom': '0'})
+                            ], color="warning", style={'margin-bottom': '0'})
                         ])
                     ])
                 ], id="usage-guide-collapse", is_open=False)
             ], style={'margin-bottom': '20px', 'background-color': '#34495e', 'border': 'none'})
-        ])
-    ]),
-    
-    # Disclaimer Notice
-    dbc.Row([
-        dbc.Col([
-            dbc.Alert([
-                html.H5("⚠️ Important Disclaimer", style={'color': '#856404', 'margin-bottom': '10px'}),
-                html.P([
-                    "The data presented in this dashboard is for informational purposes only and should ",
-                    html.Strong("not be considered ground truth"), 
-                    ". Investment decisions should ",
-                    html.Strong("never"), 
-                    " be made solely based on the values shown here. Always verify all financial data with reliable, official sources before making any investment decisions. Past performance does not guarantee future results."
-                ], style={'margin-bottom': '0'})
-            ], color="warning", style={'margin-bottom': '20px'})
         ])
     ]),
     
@@ -748,34 +850,22 @@ app.layout = dbc.Container([
             html.Hr(style={'border-color': '#555', 'margin': '15px 0'}),
             dbc.Row([
                 dbc.Col([
-                    html.Label("🔍 Add New Stock Symbol:", style={'color': '#fff', 'font-weight': 'bold'}),
-                    html.P("Enter any stock symbol to fetch its dividend data dynamically", 
+                    html.Label("🔍 Add New Stock:", style={'color': '#fff', 'font-weight': 'bold'}),
+                    html.P("Search by name or symbol", 
                            style={'color': '#888', 'font-size': '0.85em', 'margin-bottom': '5px'})
-                ], width=3),
+                ], width=2),
                 
                 dbc.Col([
-                    dcc.Input(
+                    dcc.Dropdown(
                         id='manual-stock-input',
-                        type='text',
-                        value='',
-                        placeholder='🔍 Enter stock symbol (e.g., AAPL, MSFT, GOOGL)',
-                        style={
-                            'width': '100%', 
-                            'height': '42px',
-                            'backgroundColor': '#2b3440', 
-                            'color': '#fff', 
-                            'border': '2px solid #4a5568',
-                            'borderRadius': '8px',
-                            'padding': '0 15px',
-                            'fontSize': '14px',
-                            'fontWeight': '500',
-                            'outline': 'none',
-                            'transition': 'all 0.3s ease',
-                            'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                        },
-                        className='custom-input'
+                        options=[],
+                        value=None,
+                        placeholder='Type a stock name or symbol (e.g., SBIN, Apple, MSFT)...',
+                        searchable=True,
+                        style={'backgroundColor': '#333', 'color': '#fff'},
+                        className='custom-dropdown'
                     )
-                ], width=3),
+                ], width=4),
                 
                 dbc.Col([
                     dbc.Button(
@@ -816,6 +906,18 @@ app.layout = dbc.Container([
             ], style={'backgroundColor': '#333', 'border': '1px solid #555', 'height': '160px'})
         ], width=6, className="pl-1")
     ], className="mb-3 no-gutters"),
+
+    # Company Info Panel (summary + links)
+    dbc.Row([
+        dbc.Col([
+            dbc.Card([
+                dbc.CardHeader([
+                    html.H5("📋 Company Info", style={'color': '#fff', 'margin': '0'})
+                ]),
+                dbc.CardBody(id="company-info-panel", style={'padding': '12px 15px'})
+            ], style={'backgroundColor': '#333', 'border': '1px solid #555'})
+        ], width=12)
+    ], className="mb-3"),
     
     # Charts Section
     dbc.Row([
@@ -1010,6 +1112,23 @@ app.index_string = '''
 </html>
 '''
 
+# Callback for stock symbol search suggestions
+@app.callback(
+    Output('manual-stock-input', 'options'),
+    [Input('manual-stock-input', 'search_value')],
+    [State('manual-stock-input', 'value'),
+     State('manual-stock-input', 'options')]
+)
+def update_symbol_suggestions(search_value, current_value, current_options):
+    """Update the manual stock input dropdown with Yahoo Finance search suggestions.
+    Preserves the currently selected option so it doesn't vanish after selection."""
+    if not search_value or len(search_value) < 1:
+        # Keep the currently selected option visible so the selection persists
+        if current_value and current_options:
+            return [opt for opt in current_options if opt.get('value') == current_value]
+        return dash.no_update
+    return search_yahoo_symbols(search_value)
+
 @app.callback(
     Output('stock-dropdown', 'options'),
     [Input('exchange-dropdown', 'value'),
@@ -1140,15 +1259,19 @@ def update_stock_dropdown(selected_exchange, selected_yield, fetch_status):
         logger.error(f"Error updating stock dropdown: {e}")
         return [{'label': 'Error Loading Data', 'value': 'none'}]
 
-# Callback for stock information panel
+# Callback for stock information panel + company info panel
 @app.callback(
-    Output('stock-info-panel', 'children'),
+    [Output('stock-info-panel', 'children'),
+     Output('company-info-panel', 'children')],
     [Input('stock-dropdown', 'value')]
 )
 def update_stock_info(selected_stock):
     """Update stock information panel"""
     if not selected_stock or selected_stock == 'none' or selected_stock.startswith('header_'):
-        return html.P("Select a stock to view information", style={'color': '#888'})
+        return (
+            html.P("Select a stock to view information", style={'color': '#888'}),
+            html.P("Select a stock to view company details", style={'color': '#888'})
+        )
     
     try:
         # Use the cached data with dynamic data
@@ -1158,7 +1281,10 @@ def update_stock_info(selected_stock):
         stock_data = df[df['ticker_symbol'] == selected_stock]
         
         if stock_data.empty:
-            return html.P("No data available for selected stock", style={'color': '#ff6b6b'})
+            return (
+                html.P("No data available for selected stock", style={'color': '#ff6b6b'}),
+                html.P("No data available", style={'color': '#ff6b6b'})
+            )
         
         # Process data - make a copy to avoid SettingWithCopyWarning
         stock_data = stock_data.copy()
@@ -1168,7 +1294,10 @@ def update_stock_info(selected_stock):
         stock_data = stock_data.dropna(subset=['dividend_per_share', 'dividend_yield_pct'])
         
         if stock_data.empty:
-            return html.P("No valid dividend data for selected stock", style={'color': '#ff6b6b'})
+            return (
+                html.P("No valid dividend data for selected stock", style={'color': '#ff6b6b'}),
+                html.P("No data available", style={'color': '#ff6b6b'})
+            )
         
         # Calculate statistics
         company_name = stock_data['company_name'].iloc[0]
@@ -1206,12 +1335,43 @@ def update_stock_info(selected_stock):
         }
         currency_symbol = currency_symbols.get(currency, currency + ' ')
         
-        return dbc.Row([
-            dbc.Col([
-                html.H5(f"🏢 {company_name}", style={'color': '#00CC96', 'margin-bottom': '10px'}),
-                html.P(f"📍 {exchange} ({country})", style={'color': '#fff', 'margin-bottom': '5px'}),
-                html.P(f"🎯 Symbol: {selected_stock}", style={'color': '#fff', 'margin-bottom': '5px'})
-            ], width=6),
+        # Fetch brief company info from yfinance
+        business_summary = None
+        sector = None
+        industry = None
+        yahoo_symbol = selected_stock  # for the URL
+        try:
+            ticker_obj = yf.Ticker(selected_stock)
+            info = ticker_obj.info or {}
+            raw_summary = info.get('longBusinessSummary', '')
+            sector = info.get('sector')
+            industry = info.get('industry')
+            # Truncate to ~2 sentences for brevity
+            if raw_summary:
+                sentences = raw_summary.split('. ')
+                business_summary = '. '.join(sentences[:2]).strip()
+                if not business_summary.endswith('.'):
+                    business_summary += '.'
+        except Exception as e:
+            logger.warning(f"Could not fetch company info for {selected_stock}: {e}")
+        
+        # Yahoo Finance links
+        yf_base = f"https://finance.yahoo.com/quote/{yahoo_symbol}"
+        yf_financials = f"{yf_base}/financials/"
+        
+        # Build the stock info panel (left side, stays compact)
+        info_children = [
+            html.H5(f"🏢 {company_name}", style={'color': '#00CC96', 'margin-bottom': '10px'}),
+            html.P(f"📍 {exchange} ({country})", style={'color': '#fff', 'margin-bottom': '5px'}),
+            html.P(f"🎯 Symbol: {selected_stock}", style={'color': '#fff', 'margin-bottom': '5px'}),
+        ]
+        if sector and industry:
+            info_children.append(
+                html.P(f"🏭 {sector} · {industry}", style={'color': '#aaa', 'margin-bottom': '5px', 'font-size': '0.9em'})
+            )
+        
+        stock_info_output = dbc.Row([
+            dbc.Col(info_children, width=6),
             dbc.Col([
                 html.P(f"📈 Avg Historical Yield: {avg_yield:.2f}%", style={'color': '#fff', 'margin-bottom': '5px'}),
                 html.P(f"💰 Latest Dividend: {currency_symbol}{latest_dividend:.3f}", style={'color': '#fff', 'margin-bottom': '5px'}),
@@ -1219,9 +1379,42 @@ def update_stock_info(selected_stock):
                 html.P(f"📊 Total Records: {total_dividends}", style={'color': '#fff', 'margin-bottom': '5px'})
             ], width=6)
         ])
+        
+        # Build the company info panel (dedicated row below)
+        company_info_parts = []
+        if business_summary:
+            company_info_parts.append(
+                html.P(f"ℹ️ {business_summary}",
+                       style={'color': '#ccc', 'font-size': '0.9em', 'margin-bottom': '8px',
+                              'line-height': '1.5'})
+            )
+        
+        # Yahoo Finance links
+        company_info_parts.append(
+            html.Div([
+                html.A("📊 Yahoo Finance", href=yf_base, target="_blank",
+                       style={'color': '#61dafb', 'margin-right': '20px', 'font-size': '0.9em',
+                              'text-decoration': 'none'}),
+                html.A("💹 Financials", href=yf_financials, target="_blank",
+                       style={'color': '#61dafb', 'margin-right': '20px', 'font-size': '0.9em',
+                              'text-decoration': 'none'}),
+                html.A(f"📈 Chart", href=f"{yf_base}/chart/", target="_blank",
+                       style={'color': '#61dafb', 'font-size': '0.9em',
+                              'text-decoration': 'none'}),
+            ], style={'margin': '0'})
+        )
+        
+        company_info_output = html.Div(company_info_parts) if company_info_parts else html.P(
+            "No company details available", style={'color': '#888'}
+        )
+        
+        return stock_info_output, company_info_output
     except Exception as e:
         logger.error(f"Error updating stock info: {e}")
-        return html.P(f"Error loading stock information: {str(e)}", style={'color': '#ff6b6b'})
+        return (
+            html.P(f"Error loading stock information: {str(e)}", style={'color': '#ff6b6b'}),
+            html.P("Error loading company details", style={'color': '#ff6b6b'})
+        )
 
 # Callback for key metrics panel
 @app.callback(
@@ -1733,7 +1926,7 @@ def fetch_new_stock_data(n_clicks, stock_symbol):
     
     if n_clicks is None or not stock_symbol:
         # Return current state without changes
-        return ("", "")
+        return ("", None)
     
     try:
         # Clean the symbol (in case it's typed manually)
@@ -1814,7 +2007,65 @@ def toggle_usage_guide(n_clicks, is_open):
     
     return is_open, "fas fa-chevron-down"
 
-# Modified get_cached_data function to include dynamic data
+# ── Callback: background-update status banner ──
+@app.callback(
+    [Output('data-update-banner', 'children'),
+     Output('update-poll-interval', 'disabled')],
+    [Input('update-poll-interval', 'n_intervals')]
+)
+def poll_update_status(n):
+    """Show / hide the data-update banner based on background thread state."""
+    status = _UPDATE_STATUS
+
+    if not status.get('needs_update'):
+        # Data was already fresh at startup — nothing to show
+        return None, True  # disable interval
+
+    if status.get('running'):
+        banner = dbc.Alert(
+            [
+                html.Div([
+                    html.Span(
+                        className='loading-spinner',
+                        style={'display': 'inline-block', 'width': '16px',
+                               'height': '16px', 'border': '2px solid #856404',
+                               'borderRadius': '50%', 'borderTopColor': 'transparent',
+                               'animation': 'spin 1s linear infinite',
+                               'marginRight': '10px', 'verticalAlign': 'middle'}),
+                    html.Strong("Updating dividend data in the background... "),
+                    html.Span(
+                        f"(last updated: {status.get('last_updated', 'unknown')}). "
+                        "The dashboard is fully usable with existing data."
+                    ),
+                ], style={'display': 'flex', 'alignItems': 'center'}),
+            ],
+            color='info',
+            dismissable=False,
+            style={'marginBottom': '15px'}
+        )
+        return banner, False  # keep polling
+
+    if status.get('finished'):
+        if status.get('error'):
+            banner = dbc.Alert(
+                f"⚠️ Background data update failed: {status['error']}. "
+                "Showing previously cached data.",
+                color='warning', dismissable=True,
+                style={'marginBottom': '15px'}
+            )
+        else:
+            banner = dbc.Alert(
+                f"✅ Dividend data updated successfully! "
+                f"(as of {status.get('last_updated', 'now')}). "
+                "Refresh the page or re-select a stock to see the latest data.",
+                color='success', dismissable=True, duration=15000,
+                style={'marginBottom': '15px'}
+            )
+        return banner, True  # stop polling
+
+    return None, True
+
+
 if __name__ == '__main__':
     # For deployment on Render or other cloud platforms
     port = int(os.environ.get('PORT', 8050))
