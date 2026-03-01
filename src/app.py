@@ -36,61 +36,6 @@ logger = logging.getLogger(__name__)
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # Custom CSS for dropdown styling
-app.index_string = '''
-<!DOCTYPE html>
-<html>
-    <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-        <style>
-            .custom-dropdown .Select-value-label,
-            .custom-dropdown .Select-placeholder,
-            .custom-dropdown .Select-input > input,
-            .custom-dropdown .VirtualizedSelectOption {
-                color: #fff !important;
-            }
-            .custom-dropdown .Select-menu-outer {
-                background-color: #333 !important;
-            }
-            .custom-dropdown .VirtualizedSelectFocusedOption {
-                background-color: #555 !important;
-                color: #fff !important;
-            }
-            
-            /* Custom Input Styling */
-            .custom-input {
-                transition: all 0.3s ease !important;
-            }
-            .custom-input:hover {
-                border-color: #667eea !important;
-                box-shadow: 0 4px 8px rgba(102, 126, 234, 0.15) !important;
-                transform: translateY(-1px) !important;
-            }
-            .custom-input:focus {
-                border-color: #667eea !important;
-                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25), 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-                transform: translateY(-1px) !important;
-                outline: none !important;
-            }
-            .custom-input::placeholder {
-                color: #a0aec0 !important;
-                font-style: italic !important;
-            }
-        </style>
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>
-'''
-
 # Initialize data loader and load data once at startup
 data_loader = DataLoader()
 
@@ -606,61 +551,6 @@ def fetch_stock_dividend_data(symbol: str) -> Dict:
         }
 
 # Custom CSS for loading animation
-app.index_string = '''
-<!DOCTYPE html>
-<html>
-    <head>
-        {%metas%}
-        <title>{%title%}</title>
-        {%favicon%}
-        {%css%}
-        <style>
-            .loading-dots {
-                display: inline-flex;
-                align-items: center;
-                color: #FFA500;
-            }
-            
-            .loading-dots::after {
-                content: "●●●";
-                animation: loading 1.5s infinite;
-                margin-left: 5px;
-            }
-            
-            @keyframes loading {
-                0% { content: "●○○"; }
-                33% { content: "○●○"; }
-                66% { content: "○○●"; }
-                100% { content: "●○○"; }
-            }
-            
-            .loading-spinner {
-                display: inline-block;
-                width: 16px;
-                height: 16px;
-                border: 2px solid #FFA500;
-                border-radius: 50%;
-                border-top-color: transparent;
-                animation: spin 1s linear infinite;
-                margin-right: 8px;
-            }
-            
-            @keyframes spin {
-                to { transform: rotate(360deg); }
-            }
-        </style>
-    </head>
-    <body>
-        {%app_entry%}
-        <footer>
-            {%config%}
-            {%scripts%}
-            {%renderer%}
-        </footer>
-    </body>
-</html>
-'''
-
 # App layout with enhanced 4-dropdown design
 app.layout = dbc.Container([
     # Hidden interval to poll background update status (every 5 s while updating)
@@ -995,109 +885,143 @@ app.index_string = '''
                 background-color: #1e1e1e !important; 
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             }
-            
-            /* Fix dropdown visibility issues */
-            .Select-control {
+
+            /* ===== Loading animations ===== */
+            .loading-dots {
+                display: inline-flex;
+                align-items: center;
+                color: #FFA500;
+            }
+            .loading-dots::after {
+                content: "●●●";
+                animation: loading 1.5s infinite;
+                margin-left: 5px;
+            }
+            @keyframes loading {
+                0%   { content: "●○○"; }
+                33%  { content: "○●○"; }
+                66%  { content: "○○●"; }
+                100% { content: "●○○"; }
+            }
+            .loading-spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #FFA500;
+                border-radius: 50%;
+                border-top-color: transparent;
+                animation: spin 1s linear infinite;
+                margin-right: 8px;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+
+            /* ===== Custom input styling ===== */
+            .custom-input {
+                transition: all 0.3s ease !important;
+            }
+            .custom-input:hover {
+                border-color: #667eea !important;
+                box-shadow: 0 4px 8px rgba(102, 126, 234, 0.15) !important;
+                transform: translateY(-1px) !important;
+            }
+            .custom-input:focus {
+                border-color: #667eea !important;
+                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25), 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+                transform: translateY(-1px) !important;
+                outline: none !important;
+            }
+            .custom-input::placeholder {
+                color: #a0aec0 !important;
+                font-style: italic !important;
+            }
+
+            /* ===== Dash Dropdown dark-theme (Dash 2.x) ===== */
+            /* Container & control */
+            .dash-dropdown .Select-control,
+            .dash-dropdown .Select--single > .Select-control,
+            .dash-dropdown .Select--multi > .Select-control {
                 background-color: #444 !important;
                 border-color: #666 !important;
                 color: #fff !important;
             }
-            
-            .Select-value-label {
+
+            /* Selected value text */
+            .dash-dropdown .Select-value-label,
+            .dash-dropdown .Select-value .Select-value-label,
+            .dash-dropdown .Select--single .Select-value .Select-value-label {
                 color: #fff !important;
                 font-weight: bold !important;
             }
-            
-            .Select-single-value {
+
+            /* Single value (newer Dash) */
+            .dash-dropdown .Select-single-value {
                 color: #fff !important;
                 font-weight: bold !important;
             }
-            
-            .Select-input > input {
+
+            /* Search input text */
+            .dash-dropdown .Select-input > input,
+            .dash-dropdown .Select-input input {
                 color: #fff !important;
             }
-            
-            .Select-placeholder {
+
+            /* Placeholder */
+            .dash-dropdown .Select-placeholder {
                 color: #aaa !important;
             }
-            
-            .Select-menu-outer {
+
+            /* Dropdown menu */
+            .dash-dropdown .Select-menu-outer {
                 background-color: #444 !important;
                 border-color: #666 !important;
                 z-index: 9999 !important;
             }
-            
-            .Select-option {
+
+            /* Options */
+            .dash-dropdown .VirtualizedSelectOption,
+            .dash-dropdown .Select-option {
                 background-color: #444 !important;
                 color: #fff !important;
                 padding: 8px 12px !important;
                 font-weight: 500 !important;
             }
-            
-            .Select-option:hover,
-            .Select-option.is-focused {
+            .dash-dropdown .VirtualizedSelectFocusedOption,
+            .dash-dropdown .Select-option.is-focused,
+            .dash-dropdown .Select-option:hover {
                 background-color: #555 !important;
                 color: #fff !important;
                 font-weight: bold !important;
             }
-            
-            .Select-option.is-selected {
+            .dash-dropdown .Select-option.is-selected {
                 background-color: #00CC96 !important;
                 color: #fff !important;
                 font-weight: bold !important;
             }
-            
-            .Select-option.is-disabled {
+            .dash-dropdown .Select-option.is-disabled {
                 background-color: #333 !important;
                 color: #888 !important;
                 font-weight: bold !important;
             }
-            
-            /* Modern dropdown styling */
+
+            /* Clear & arrow indicators */
+            .dash-dropdown .Select-clear-zone,
+            .dash-dropdown .Select-arrow-zone {
+                color: #aaa !important;
+            }
+            .dash-dropdown .Select-arrow {
+                border-color: #aaa transparent transparent !important;
+            }
+
+            /* ===== Fallback: target by data attribute (newest Dash builds) ===== */
+            div[data-dash-is-loading] .Select-control {
+                background-color: #444 !important;
+            }
+
+            /* Font size */
             .dash-dropdown {
                 font-size: 14px !important;
-            }
-            
-            .dash-dropdown .dropdown {
-                background-color: #444 !important;
-            }
-            
-            .dash-dropdown .dropdown .dropdown-toggle {
-                background-color: #444 !important;
-                border: 2px solid #666 !important;
-                color: #fff !important;
-                font-weight: bold !important;
-                padding: 10px 15px !important;
-            }
-            
-            .dash-dropdown .dropdown .dropdown-toggle:focus {
-                border-color: #00CC96 !important;
-                box-shadow: 0 0 0 0.2rem rgba(0, 204, 150, 0.25) !important;
-            }
-            
-            .dash-dropdown .dropdown-menu {
-                background-color: #444 !important;
-                border: 1px solid #666 !important;
-                max-height: 300px !important;
-                overflow-y: auto !important;
-            }
-            
-            .dash-dropdown .dropdown-item {
-                color: #fff !important;
-                padding: 8px 15px !important;
-                border-bottom: 1px solid #555 !important;
-            }
-            
-            .dash-dropdown .dropdown-item:hover,
-            .dash-dropdown .dropdown-item:focus {
-                background-color: #555 !important;
-                color: #fff !important;
-            }
-            
-            .dash-dropdown .dropdown-item.disabled {
-                color: #888 !important;
-                background-color: #333 !important;
-                font-weight: bold !important;
             }
         </style>
     </head>
